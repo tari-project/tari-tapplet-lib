@@ -1,0 +1,22 @@
+name = "password_manager"
+version = "0.1.0"
+friendly_name = "Password Manager"
+description = "A simple password manager tapplet."
+publisher = "a86b454a33b98f7f4f296a86dcbf08eaa816de5347d5c932b5fed8a95c52d04a"
+git = { url = "https://github.com/stringhandler/password_manager_tapplet", rev = "main" }
+
+[api]
+methods = ["greet"]
+
+[api.greet]
+description = "Returns a greeting message."
+
+[api.greet.params]
+name = { type = "string", description = "The name to greet." }
+
+[api.greet.returns]
+type = "string"
+description = "A greeting message."
+
+[sigs]
+todo = "add sigs here"
