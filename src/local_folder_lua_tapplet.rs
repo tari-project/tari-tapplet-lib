@@ -11,7 +11,7 @@ pub struct LocalFolderLuaTapplet {
 impl LocalFolderLuaTapplet {
     pub fn load(path: PathBuf) -> Result<Self> {
         let manifest_file = path.join("manifest.toml");
-        if manifest_file.exists() == false {
+        if !manifest_file.exists() {
             bail!(
                 "No manifest.toml found in the specified directory: {}",
                 path.display()

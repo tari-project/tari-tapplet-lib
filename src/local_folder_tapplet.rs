@@ -12,7 +12,7 @@ pub struct LocalFolderTapplet {
 impl LocalFolderTapplet {
     pub fn load(path: PathBuf) -> Result<Self> {
         let manifest_file = path.join("manifest.toml");
-        if manifest_file.exists() == false {
+        if !manifest_file.exists() {
             bail!(
                 "No manifest.toml found in the specified directory: {}",
                 path.display()
@@ -47,7 +47,7 @@ impl LocalFolderTapplet {
         println!("Compiling tapplet to WASM...");
         let output = Command::new("cargo")
             .current_dir(&self.path)
-            .args(&["build", "--release", "--target", "wasm32-unknown-unknown"])
+            .args(["build", "--release", "--target", "wasm32-unknown-unknown"])
             .output()
             .context("Failed to execute cargo build. Is cargo installed?")?;
 

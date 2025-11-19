@@ -70,7 +70,7 @@ impl TappletConfig {
     /// Load a tapplet configuration from a TOML file
     pub fn from_file<P: AsRef<Path>>(path: P) -> Result<Self> {
         let content = std::fs::read_to_string(path)?;
-        Ok(Self::from_toml_str(&content)?)
+        Self::from_toml_str(&content)
     }
 }
 

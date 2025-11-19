@@ -159,7 +159,7 @@ impl TappletRegistry {
     }
 
     pub fn search(&self, query: &str) -> Result<Vec<&TappletConfig>> {
-        if self.is_loaded == false {
+        if !self.is_loaded {
             anyhow::bail!("Registry not loaded. Please call fetch() or load() first.");
         }
         let query_lower = query.to_lowercase();
@@ -308,8 +308,8 @@ fn parse_tapplets_from_repo(repo_path: &Path) -> Result<Vec<TappletConfig>> {
         }
 
         // Look for tapplet.toml or files ending in -tapplet.toml
-        if let Some(file_name) = path.file_name().and_then(|n| n.to_str()) {
-            if file_name == "manifest.toml" {
+        if let Some(file_name) = path.file_name().and_then(|n| n.to_str())
+            && file_name == "manifest.toml" {
                 match TappletConfig::from_file(path.to_str().unwrap()) {
                     Ok(config) => tapplets.push(config),
                     Err(e) => {
@@ -317,7 +317,6 @@ fn parse_tapplets_from_repo(repo_path: &Path) -> Result<Vec<TappletConfig>> {
                     }
                 }
             }
-        }
     }
 
     Ok(tapplets)
