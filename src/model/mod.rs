@@ -19,6 +19,12 @@ impl TappletConfig {
     pub fn canonical_name(&self) -> String {
         format!("{}@{}", self.name.replace("-", "_"), self.version)
     }
+
+    pub fn name_matches(&self, other_name: &str) -> bool {
+        self.name == other_name
+            || self.name.replace("-", "_") == other_name
+            || self.name.replace("_", "-") == other_name
+    }
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
