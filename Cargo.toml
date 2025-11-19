@@ -18,7 +18,7 @@ mlua = { version = "0.10", features = [
 ], optional = true }
 serde_json = "1.0"
 git2 = "0.19"
-tokio = { version = "1.0", features = ["rt", "macros"] }
+tokio = { version = "1.0", features = ["rt", "rt-multi-thread", "macros"] }
 walkdir = "2.5"
 anyhow = "1.0.100"
 async-trait = "0.1.89"

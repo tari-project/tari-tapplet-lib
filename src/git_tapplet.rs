@@ -10,9 +10,8 @@ pub struct GitTapplet {
 }
 
 impl GitTapplet {
-    pub fn new(config: TappletConfig) -> Self {
+    pub fn new(_config: TappletConfig) -> Self {
         todo!("Need to find a way to validate safely that this repo can be used");
-        Self { config }
     }
 
     pub fn install(&self, cache_directory: PathBuf) -> Result<()> {

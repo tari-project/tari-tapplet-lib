@@ -177,7 +177,9 @@ impl TappletRegistry {
 }
 
 struct FetchResult {
+    #[allow(dead_code)]
     repository_path: PathBuf,
+    #[allow(dead_code)]
     was_cloned: bool,
     commit_hash: String,
     tapplets: Vec<TappletConfig>,

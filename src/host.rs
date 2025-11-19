@@ -6,7 +6,7 @@ use tokio::{runtime::Handle, task};
 use wasmer::{Instance, Module, Store, Value as WasmValue};
 
 #[cfg(feature = "host")]
-use mlua::{Lua, MultiValue, Table};
+use mlua::Lua;
 
 #[derive(Debug)]
 pub enum HostError {
@@ -456,12 +456,12 @@ impl<T: MinotariTappletApiV1 + 'static> LuaTappletHost<T> {
             Value::Number(n) => {
                 if let Some(i) = n.as_i64() {
                     if i >= i32::MIN as i64 && i <= i32::MAX as i64 {
-                        return Ok(mlua::Value::Integer(i as i32));
+                        Ok(mlua::Value::Integer(i as i32))
                     } else {
-                        return Err(HostError::InvalidArguments(format!(
+                        Err(HostError::InvalidArguments(format!(
                             "Integer out of range for Lua: {}",
                             i
-                        )));
+                        )))
                     }
                 } else if let Some(f) = n.as_f64() {
                     Ok(mlua::Value::Number(f))
