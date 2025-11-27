@@ -1,6 +1,6 @@
 use std::path::{Path, PathBuf};
 
-use crate::TappletConfig;
+use crate::TappletManifest;
 use anyhow::{Context, Result};
 use git2::{
     AutotagOption, FetchOptions as Git2FetchOptions, RemoteCallbacks, Repository,
@@ -12,7 +12,7 @@ pub struct TappletRegistry {
     pub git_url: String,
     pub cache_directory: PathBuf,
     pub current_revision: Option<String>,
-    pub tapplets: Vec<TappletConfig>,
+    pub tapplets: Vec<TappletManifest>,
     is_loaded: bool,
 }
 
@@ -158,7 +158,7 @@ impl TappletRegistry {
         })
     }
 
-    pub fn search(&self, query: &str) -> Result<Vec<&TappletConfig>> {
+    pub fn search(&self, query: &str) -> Result<Vec<&TappletManifest>> {
         if !self.is_loaded {
             anyhow::bail!("Registry not loaded. Please call fetch() or load() first.");
         }
@@ -169,13 +169,16 @@ impl TappletRegistry {
             .filter(|tapplet| {
                 tapplet.name.to_lowercase().contains(&query_lower)
                     || tapplet.friendly_name.to_lowercase().contains(&query_lower)
-                    || tapplet.description.to_lowercase().contains(&query_lower)
+                    || tapplet
+                        .description
+                        .as_ref()
+                        .map_or(false, |desc| desc.to_lowercase().contains(&query_lower))
                     || tapplet.publisher.to_lowercase().contains(&query_lower)
             })
             .collect())
     }
 
-    pub fn tapplets_and_dirs(&self) -> Result<Vec<(&TappletConfig, PathBuf)>> {
+    pub fn tapplets_and_dirs(&self) -> Result<Vec<(&TappletManifest, PathBuf)>> {
         if !self.is_loaded {
             anyhow::bail!("Registry not loaded. Please call fetch() or load() first.");
         }
@@ -198,7 +201,7 @@ struct FetchResult {
     #[allow(dead_code)]
     was_cloned: bool,
     commit_hash: String,
-    tapplets: Vec<TappletConfig>,
+    tapplets: Vec<TappletManifest>,
 }
 
 /// Clone a repository from a URL to a local path
@@ -310,7 +313,7 @@ fn checkout_default_branch(repo: &Repository) -> Result<()> {
 }
 
 /// Parse all tapplet configurations from a repository
-fn parse_tapplets_from_repo(repo_path: &Path) -> Result<Vec<TappletConfig>> {
+fn parse_tapplets_from_repo(repo_path: &Path) -> Result<Vec<TappletManifest>> {
     let mut tapplets = Vec::new();
 
     // Walk through the repository looking for .toml files
@@ -329,7 +332,7 @@ fn parse_tapplets_from_repo(repo_path: &Path) -> Result<Vec<TappletConfig>> {
         if let Some(file_name) = path.file_name().and_then(|n| n.to_str())
             && file_name == "manifest.toml"
         {
-            match TappletConfig::from_file(path.to_str().unwrap()) {
+            match TappletManifest::from_file(path.to_str().unwrap()) {
                 Ok(config) => tapplets.push(config),
                 Err(e) => {
                     eprintln!("Warning: Failed to parse {}: {}", path.display(), e);

@@ -3,19 +3,18 @@ use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, path::Path};
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct TappletConfig {
+pub struct TappletManifest {
     pub name: String,
     pub version: String,
     pub friendly_name: String,
-    pub description: String,
+    pub description: Option<String>,
     pub publisher: String,
-    pub git: GitConfig,
     pub api: ApiConfig,
     pub sigs: SigsConfig,
     pub public_key: String,
 }
 
-impl TappletConfig {
+impl TappletManifest {
     pub fn canonical_name(&self) -> String {
         format!("{}@{}", self.name.replace("-", "_"), self.version)
     }
@@ -67,7 +66,7 @@ pub struct SigsConfig {
     pub todo: String,
 }
 
-impl TappletConfig {
+impl TappletManifest {
     /// Parse a tapplet configuration from a TOML string
     pub fn from_toml_str(toml_str: &str) -> Result<Self> {
         Ok(toml::from_str(toml_str)?)
@@ -112,7 +111,7 @@ description = "A greeting message."
 todo = "add sigs here"
 "#;
 
-        let config = TappletConfig::from_toml_str(toml_content).unwrap();
+        let config = TappletManifest::from_toml_str(toml_content).unwrap();
 
         assert_eq!(config.name, "password_manager");
         assert_eq!(config.version, "0.1.0");

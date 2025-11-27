@@ -1,4 +1,4 @@
-use crate::model::TappletConfig;
+use crate::model::TappletManifest;
 use async_trait::async_trait;
 use serde_json::Value;
 use std::path::Path;
@@ -73,14 +73,14 @@ impl From<mlua::Error> for HostError {
 }
 
 pub struct WasmTappletHost {
-    config: TappletConfig,
+    config: TappletManifest,
     store: Store,
     instance: Instance,
 }
 
 impl WasmTappletHost {
     /// Create a new TappletHost by loading a WASM module from a file
-    pub fn new(config: TappletConfig, wasm_path: impl AsRef<Path>) -> Result<Self, HostError> {
+    pub fn new(config: TappletManifest, wasm_path: impl AsRef<Path>) -> Result<Self, HostError> {
         // Read the WASM file
         let wasm_bytes = std::fs::read(wasm_path)?;
 
@@ -101,7 +101,7 @@ impl WasmTappletHost {
     }
 
     /// Create a new TappletHost from WASM bytes
-    pub fn from_bytes(config: TappletConfig, wasm_bytes: &[u8]) -> Result<Self, HostError> {
+    pub fn from_bytes(config: TappletManifest, wasm_bytes: &[u8]) -> Result<Self, HostError> {
         // Create a new store
         let mut store = Store::default();
 
@@ -258,7 +258,7 @@ impl WasmTappletHost {
     }
 
     /// Get the tapplet configuration
-    pub fn config(&self) -> &TappletConfig {
+    pub fn config(&self) -> &TappletManifest {
         &self.config
     }
 }
@@ -274,7 +274,7 @@ impl WasmTappletHost {
 /// # Returns
 /// A JSON value containing the result of the method call
 pub fn run(
-    config: TappletConfig,
+    config: TappletManifest,
     wasm_path: impl AsRef<Path>,
     method: &str,
     args: Value,
@@ -295,7 +295,7 @@ mod tests {
 
     #[test]
     fn test_invalid_wasm_error() {
-        let config = TappletConfig {
+        let config = TappletManifest {
             name: "test".to_string(),
             version: "0.1.0".to_string(),
             friendly_name: "Test".to_string(),
@@ -331,10 +331,11 @@ mod tests {
 pub trait MinotariTappletApiV1: Clone {
     async fn append_data(&self, slot: &str, value: &str) -> Result<(), anyhow::Error>;
     async fn load_data_entries(&self, slot: &str) -> Result<Vec<String>, anyhow::Error>;
+    async fn add_watched_viewkey(&self, viewkey: &str) -> Result<(), anyhow::Error>;
 }
 
 pub struct LuaTappletHost<T> {
-    config: TappletConfig,
+    config: TappletManifest,
     lua: Lua,
     api: T,
 }
@@ -342,7 +343,7 @@ pub struct LuaTappletHost<T> {
 impl<T: MinotariTappletApiV1 + 'static> LuaTappletHost<T> {
     /// Create a new LuaTappletHost by loading a Lua script from a file
     pub fn new(
-        config: TappletConfig,
+        config: TappletManifest,
         lua_path: impl AsRef<Path>,
         api: T,
     ) -> Result<Self, HostError> {
@@ -362,7 +363,7 @@ impl<T: MinotariTappletApiV1 + 'static> LuaTappletHost<T> {
     }
 
     /// Create a new LuaTappletHost from a Lua code string
-    pub fn from_string(config: TappletConfig, lua_code: &str, api: T) -> Result<Self, HostError> {
+    pub fn from_string(config: TappletManifest, lua_code: &str, api: T) -> Result<Self, HostError> {
         // Create a new Lua instance
         let lua = Lua::new();
 
@@ -428,12 +429,26 @@ impl<T: MinotariTappletApiV1 + 'static> LuaTappletHost<T> {
             })
         })?;
 
+        let api4 = self.api.clone();
+        let rust_add_watched_viewkey = self.lua.create_function(move |_, viewkey: String| {
+            task::block_in_place(|| {
+                Handle::current().block_on(async {
+                    api4.add_watched_viewkey(&viewkey).await?;
+                    Result::<_, anyhow::Error>::Ok(())
+                })?;
+                Ok(())
+            })
+        })?;
+
         self.lua
             .globals()
             .set("minotari_append_data", rust_append_data)?;
         self.lua
             .globals()
             .set("minotari_load_data_entries", rust_load_data_entries)?;
+        self.lua
+            .globals()
+            .set("minotari_add_watched_viewkey", rust_add_watched_viewkey)?;
 
         // self.lua.globals().set("api", self.lua.create_table()?)?;
 
@@ -576,7 +591,7 @@ impl<T: MinotariTappletApiV1 + 'static> LuaTappletHost<T> {
     }
 
     /// Get the tapplet configuration
-    pub fn config(&self) -> &TappletConfig {
+    pub fn config(&self) -> &TappletManifest {
         &self.config
     }
 }

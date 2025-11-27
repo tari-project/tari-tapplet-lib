@@ -1,11 +1,11 @@
 use std::path::PathBuf;
 
-use crate::TappletConfig;
+use crate::TappletManifest;
 use anyhow::{Context, Result, bail};
 
 pub struct LocalFolderLuaTapplet {
     path: PathBuf,
-    pub config: TappletConfig,
+    pub config: TappletManifest,
 }
 
 impl LocalFolderLuaTapplet {
@@ -17,7 +17,7 @@ impl LocalFolderLuaTapplet {
                 path.display()
             );
         }
-        let config = TappletConfig::from_file(&manifest_file)?;
+        let config = TappletManifest::from_file(&manifest_file)?;
 
         Ok(Self { path, config })
     }
