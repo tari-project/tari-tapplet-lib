@@ -331,7 +331,7 @@ mod tests {
 pub trait MinotariTappletApiV1: Clone {
     async fn append_data(&self, slot: &str, value: &str) -> Result<(), anyhow::Error>;
     async fn load_data_entries(&self, slot: &str) -> Result<Vec<String>, anyhow::Error>;
-    async fn add_watched_viewkey(&self, viewkey: &str) -> Result<(), anyhow::Error>;
+    async fn add_watched_viewkey(&self, viewkey: &str, birthday: u64) -> Result<(), anyhow::Error>;
 }
 
 pub struct LuaTappletHost<T> {
@@ -430,15 +430,17 @@ impl<T: MinotariTappletApiV1 + 'static> LuaTappletHost<T> {
         })?;
 
         let api4 = self.api.clone();
-        let rust_add_watched_viewkey = self.lua.create_function(move |_, viewkey: String| {
-            task::block_in_place(|| {
-                Handle::current().block_on(async {
-                    api4.add_watched_viewkey(&viewkey).await?;
-                    Result::<_, anyhow::Error>::Ok(())
+        let rust_add_watched_viewkey =
+            self.lua
+                .create_function(move |_, (viewkey, birthday): (String, i32)| {
+                    task::block_in_place(|| {
+                        Handle::current().block_on(async {
+                            api4.add_watched_viewkey(&viewkey, birthday as u64).await?;
+                            Result::<_, anyhow::Error>::Ok(())
+                        })?;
+                        Ok(())
+                    })
                 })?;
-                Ok(())
-            })
-        })?;
 
         self.lua
             .globals()
