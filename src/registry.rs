@@ -193,6 +193,27 @@ impl TappletRegistry {
         }
         Ok(results)
     }
+
+    pub fn find_tapplet_and_dir_by_pub_key(
+        &self,
+        public_key: &str,
+    ) -> Result<Option<(&TappletManifest, PathBuf)>> {
+        if !self.is_loaded {
+            anyhow::bail!("Registry not loaded. Please call fetch() or load() first.");
+        }
+        Ok(self
+            .tapplets
+            .iter()
+            .find(|tapplet| tapplet.public_key == public_key)
+            .map(|tapplet| {
+                let dir = self
+                    .cache_directory
+                    .join(sanitize_repo_name(&self.git_url))
+                    .join("tapplets")
+                    .join(&tapplet.public_key);
+                (tapplet, dir)
+            }))
+    }
 }
 
 struct FetchResult {
