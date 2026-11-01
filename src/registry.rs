@@ -303,12 +303,15 @@ fn fetch_updates(repo: &Repository) -> Result<()> {
     if analysis.0.is_up_to_date() {
         Ok(())
     } else if analysis.0.is_fast_forward() {
-        let refname = "refs/heads/main";
         let mut reference = repo
-            .find_reference(refname)
+            .find_reference("refs/heads/main")
             .or_else(|_| repo.find_reference("refs/heads/master"))?;
+        let target_refname = reference
+            .name()
+            .ok_or_else(|| anyhow::anyhow!("Branch reference name is not valid UTF-8"))?
+            .to_string();
         reference.set_target(fetch_commit.id(), "Fast-Forward")?;
-        repo.set_head(refname)?;
+        repo.set_head(&target_refname)?;
         repo.checkout_head(Some(git2::build::CheckoutBuilder::default().force()))?;
         Ok(())
     } else {
@@ -353,7 +356,7 @@ fn parse_tapplets_from_repo(repo_path: &Path) -> Result<Vec<TappletManifest>> {
         if let Some(file_name) = path.file_name().and_then(|n| n.to_str())
             && file_name == "manifest.toml"
         {
-            match TappletManifest::from_file(path.to_str().unwrap()) {
+            match TappletManifest::from_file(path) {
                 Ok(config) => tapplets.push(config),
                 Err(e) => {
                     eprintln!("Warning: Failed to parse {}: {}", path.display(), e);

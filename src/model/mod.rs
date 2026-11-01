@@ -117,8 +117,12 @@ todo = "add sigs here"
         assert_eq!(config.version, "0.1.0");
         assert_eq!(config.friendly_name, "Password Manager");
         assert_eq!(
-            config.git.url,
-            "https://github.com/stringhandler/password_manager_tapplet"
+            config.description.as_deref(),
+            Some("A simple password manager tapplet.")
+        );
+        assert_eq!(
+            config.public_key,
+            "a86b454a33b98f7f4f296a86dcbf08eaa816de5347d5c932b5fed8a95c52d04a"
         );
         assert_eq!(config.api.methods, vec!["greet"]);
         assert!(config.api.method_definitions.contains_key("greet"));

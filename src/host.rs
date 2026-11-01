@@ -299,12 +299,9 @@ mod tests {
             name: "test".to_string(),
             version: "0.1.0".to_string(),
             friendly_name: "Test".to_string(),
-            description: "Test tapplet".to_string(),
+            description: Some("Test tapplet".to_string()),
             publisher: "test_publisher".to_string(),
-            git: crate::model::GitConfig {
-                url: "https://example.com".to_string(),
-                rev: "main".to_string(),
-            },
+            public_key: "test_public_key".to_string(),
             api: crate::model::ApiConfig {
                 methods: vec!["test".to_string()],
                 method_definitions: std::collections::HashMap::new(),
@@ -317,13 +314,97 @@ mod tests {
         // Create an invalid WASM module for testing error handling
         let wasm_bytes = vec![0x00, 0x61, 0x73, 0x6d];
 
-        let result = TappletHost::from_bytes(config, &wasm_bytes);
+        let result = WasmTappletHost::from_bytes(config, &wasm_bytes);
         // This should fail because it's not a complete valid WASM module
         assert!(result.is_err());
         if let Err(e) = result {
             // Verify we get a proper error message
             assert!(!e.to_string().is_empty());
         }
+    }
+
+    #[derive(Clone, Default)]
+    struct MockApi {
+        watched: std::sync::Arc<std::sync::Mutex<Vec<(String, u64)>>>,
+    }
+
+    #[async_trait]
+    impl MinotariTappletApiV1 for MockApi {
+        async fn append_data(&self, _slot: &str, _value: &str) -> Result<(), anyhow::Error> {
+            Ok(())
+        }
+
+        async fn load_data_entries(&self, _slot: &str) -> Result<Vec<String>, anyhow::Error> {
+            Ok(vec![])
+        }
+
+        async fn add_watched_viewkey(
+            &self,
+            viewkey: &str,
+            birthday: u64,
+        ) -> Result<(), anyhow::Error> {
+            self.watched
+                .lock()
+                .unwrap()
+                .push((viewkey.to_string(), birthday));
+            Ok(())
+        }
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn test_lua_from_string_enables_sandbox_and_rejects_negative_birthday() {
+        let config = TappletManifest {
+            name: "test".to_string(),
+            version: "0.1.0".to_string(),
+            friendly_name: "Test".to_string(),
+            description: Some("Test tapplet".to_string()),
+            publisher: "test_publisher".to_string(),
+            public_key: "test_public_key".to_string(),
+            api: crate::model::ApiConfig {
+                methods: vec![
+                    "check_sandbox".to_string(),
+                    "watch_negative".to_string(),
+                    "watch_valid".to_string(),
+                ],
+                method_definitions: std::collections::HashMap::new(),
+            },
+            sigs: crate::model::SigsConfig {
+                todo: "test".to_string(),
+            },
+        };
+
+        let lua_code = r#"
+            function check_sandbox()
+                return os == nil and io == nil
+            end
+            function watch_negative()
+                minotari_add_watched_viewkey("vk", -1)
+                return true
+            end
+            function watch_valid()
+                minotari_add_watched_viewkey("vk", 42)
+                return true
+            end
+        "#;
+
+        let api = MockApi::default();
+        let host = LuaTappletHost::from_string(config, lua_code, api.clone()).unwrap();
+
+        // Standard dangerous libraries like `os` and `io` are nil in mlua sandbox mode,
+        // and attempting to mutate global library tables is blocked.
+        let mutating_global = host
+            .lua
+            .load("string.injected = 1")
+            .exec();
+        assert!(mutating_global.is_err());
+
+        let neg_res = host.run("watch_negative", Value::Null).await;
+        assert!(neg_res.is_err());
+        assert!(api.watched.lock().unwrap().is_empty());
+
+        let ok_res = host.run("watch_valid", Value::Null).await.unwrap();
+        assert_eq!(ok_res, Value::Bool(true));
+        assert_eq!(*api.watched.lock().unwrap(), vec![("vk".to_string(), 42)]);
     }
 }
 
@@ -366,6 +447,7 @@ impl<T: MinotariTappletApiV1 + 'static> LuaTappletHost<T> {
     pub fn from_string(config: TappletManifest, lua_code: &str, api: T) -> Result<Self, HostError> {
         // Create a new Lua instance
         let lua = Lua::new();
+        lua.sandbox(true)?;
 
         // Load and execute the Lua code to define functions
         lua.load(lua_code)
@@ -432,10 +514,10 @@ impl<T: MinotariTappletApiV1 + 'static> LuaTappletHost<T> {
         let api4 = self.api.clone();
         let rust_add_watched_viewkey =
             self.lua
-                .create_function(move |_, (viewkey, birthday): (String, i32)| {
+                .create_function(move |_, (viewkey, birthday): (String, u64)| {
                     task::block_in_place(|| {
                         Handle::current().block_on(async {
-                            api4.add_watched_viewkey(&viewkey, birthday as u64).await?;
+                            api4.add_watched_viewkey(&viewkey, birthday).await?;
                             Result::<_, anyhow::Error>::Ok(())
                         })?;
                         Ok(())
